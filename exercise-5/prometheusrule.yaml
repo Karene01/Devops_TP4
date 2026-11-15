@@ -52,9 +52,45 @@ spec:
           annotations:
             summary: Guestbook burns its error budget fast (2% of the month in 1h)
             description: "{{ $value | humanizePercentage }} of the requests fail."
-            runbook_url: https://github.com/<your-account>/devops-class-4/blob/main/exercise-7/guestbook-error-budget-burn.md
+            runbook_url: https://github.com/Karene01/Devops_TP4/blob/main/exercise-7/guestbook-error-budget-burn.md
         # TODO: GuestbookErrorBudgetBurnSlow, 6x the budget over 6h and 30m, for: 15m, severity: warning
+        - alert: GuestbookErrorBudgetBurnSlow
+          expr: |
+            guestbook:sli_errors:ratio_rate6h > (6 * 0.01)
+            and
+            guestbook:sli_errors:ratio_rate30m > (6 * 0.01)
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: Guestbook burns its error budget slowly (5% of the month in 6h)
+            description: "{{ $value | humanizePercentage }} of the requests fail."
+            runbook_url: https://github.com/Karene01/Devops_TP4/blob/main/exercise-7/guestbook-error-budget-burn.md
 
     # TODO: a group "guestbook-health" with
     #   - GuestbookDown: every guestbook target down, or no target at all
     #   - an alert on the cause, with the gauge guestbook_redis_up
+    - name: guestbook-health
+      rules:
+        # absent() keeps the labels of its equality matchers (job, namespace),
+        # sum by (namespace) keeps the one Alertmanager routes on
+        - alert: GuestbookDown
+          expr: |
+            sum by (namespace) (up{job="guestbook", namespace="guestbook"}) == 0
+            or
+            absent(up{job="guestbook", namespace="guestbook"})
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: No guestbook instance is up
+            runbook_url: https://github.com/Karene01/Devops_TP4/blob/main/exercise-7/guestbook-error-budget-burn.md
+        # Cause alert: informs, does not page. Users are already covered by the symptom alerts
+        - alert: GuestbookRedisDown
+          expr: max by (namespace) (guestbook_redis_up{job="guestbook", namespace="guestbook"}) == 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: The guestbook cannot reach Redis
+            runbook_url: https://github.com/Karene01/Devops_TP4/blob/main/exercise-7/guestbook-error-budget-burn.md
